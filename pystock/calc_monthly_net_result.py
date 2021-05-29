@@ -9,8 +9,8 @@ import pdfplumber
 import re
 import json, codecs
 
-# import pystock.helpersio as hio#Running from package perspective
-import helpersio as hio
+import pystock.helpersio as hio#Running from package perspective
+# import helpersio as hio
 import sys
 
 HEADERS_TABLE_NET_PER_STOCK = [
@@ -28,14 +28,67 @@ HEADERS_TABLE_NET_PER_STOCK = [
 ]
 
 
-def _load_table_net_per_stock(path):
+def _transform_str_numeric_read_negocios_realizados(row):
+    """Transformation fucntion from string to numeric for rows of table net_per_stock.
+
+    Args:
+        row (list): List of strings
+
+    Returns:
+        list: List of strings and numeric.
+    """
+    row[8] = int(float(row[8]))
+    row[9] = float(row[9])
+    row[10] = float(row[10])
+    row[13] = float(row[13])
+    return row
+
+
+def _transform_str_numeric_read_net_per_stock(row):
+    """Transformation fucntion from string to numeric for rows of table net_per_stock.
+        "Month Year",
+    "Ticker",
+    "Available Quantity units",(int)
+    "Average Buy Price brl_unit",(float)
+    "Sold Quantity units",(int)
+    "Average Sell Price brl_unit",(float)
+    "Profit per unit brl_per_unit",(float)
+    "Unit profit per stock including sales operations costs",(float)
+    "Profit brl",(float)
+    "Remain Quantity units",(int)
+    "Remain Operation value w taxes brl",(float)
+
+
+    Args:
+        row (list): List of strings
+
+    Returns:
+        list: List of strings and numeric.
+    """
+    row[2] = int(float(row[2]))
+    row[3] = float(row[3])
+    row[4] = int(float(row[4]))
+    row[5] = float(row[5])
+    row[6] = float(row[6])
+    row[7] = float(row[7])
+    row[8] = float(row[8])
+    row[9] = int(float(row[9]))
+    row[10] = float(row[10])
+    return row
+
+
+def _load_table_net_per_stock(path, skip_headers=False):
     if os.path.exists(path) == False:
         print(
             f"Could not find the path {path}, a new table for net_per_stock will be created."
         )
         a = []
         hio.export_to_csv_from_lists(a, path)
-    b = hio.read_csv(path)
+    b = hio.read_csv(
+        path,
+        skip_headers=skip_headers,
+        func_transf_row=_transform_str_numeric_read_net_per_stock,
+    )
     return b
 
 
@@ -338,22 +391,20 @@ def _append_net_per_stock_for_month(net_per_stock, month_year, negocios_realizad
         line = [month_year, ticker]
         buy_units = 0
         buy_value = 0
-        sell_units = 0.0
+        sell_units = 0
         sell_value = 0.0
         sell_value_with_ops_cost = 0.0
         for k in range(prev_ix, next_ix):  # Loop all notas
             if ticker == negocios_realizados[k][6]:
                 if negocios_realizados[k][3] == "C":  # compra
-                    buy_units += int(negocios_realizados[k][8])
-                    buy_value += float(negocios_realizados[k][10]) + float(
-                        negocios_realizados[k][13]
+                    buy_units += negocios_realizados[k][8]
+                    buy_value += (
+                        negocios_realizados[k][10] + negocios_realizados[k][13]
                     )  # Valor operacao+Taxas
                 elif negocios_realizados[k][3] == "V":  # Venda
-                    sell_units += int(negocios_realizados[k][8])
-                    sell_value += float(negocios_realizados[k][10])
-                    sell_value_with_ops_cost += sell_value + float(
-                        negocios_realizados[k][13]
-                    )
+                    sell_units += negocios_realizados[k][8]
+                    sell_value += negocios_realizados[k][10]
+                    sell_value_with_ops_cost += sell_value + negocios_realizados[k][13]
 
         prev_units, prev_value = get_stocks_per_ticker_previous_month_year(
             ticker, net_per_stock
@@ -370,19 +421,17 @@ def _append_net_per_stock_for_month(net_per_stock, month_year, negocios_realizad
             round(avg_sell_price - avg_buy_price, 2) if sell_units > 0.01 else 0.0
         )
         avg_sell_price_with_ops_cost = (
-            round(sell_value_with_ops_cost / sell_units, 2)
-            if sell_units > 0.01
-            else 0.0
+            round(sell_value_with_ops_cost / sell_units, 2) if sell_units >= 0.01 else 0
         )
         avg_unit_profit_loss_with_ops_cost = (
             round(avg_sell_price_with_ops_cost - avg_buy_price, 2)
-            if sell_units > 0.01
-            else 0.0
+            if sell_units >= 0.01
+            else 0
         )
 
         net_units = prev_units + buy_units - sell_units
         net_value = (
-            round(prev_value + buy_value - sell_value, 2) if net_units > 0.01 else 0.0
+            round(prev_value + buy_value - sell_value, 2) if net_units >= 0.01 else 0.0
         )
 
         line.extend(
@@ -433,7 +482,7 @@ def _create_net_per_stock_year_balance(net_per_stock):
 
 
 def main():
-    cur_year = 2019
+    cur_year = 2020
     prev_year = cur_year - 1
 
     data_processed_notas_path_cur_year = os.path.abspath(
@@ -442,17 +491,22 @@ def main():
     data_processed_notas_path_prev_year = os.path.abspath(
         os.path.join(f"data/processed/{prev_year}/btg/notas_corretagem/")
     )
+    test_data_path = os.path.abspath(os.path.join("tests/tests_data/"))
+
+
     negocios_realizados = hio.read_csv(
         os.path.join(
             data_processed_notas_path_cur_year, f"negocios_realizados_{cur_year}.csv"
-        )
+        ),
+        skip_headers=True,func_transf_row=_transform_str_numeric_read_negocios_realizados
     )
     try:
-        net_per_stock = _load_table_net_per_stock(
+        net_per_stock = hio.read_csv(
             os.path.join(
                 data_processed_notas_path_prev_year,
-                f"net_per_stock_balance{prev_year}.csv",
-            )
+                f"net_per_stock_year_balance{prev_year}.csv",
+            ),
+            skip_headers=False,func_transf_row=_transform_str_numeric_read_net_per_stock
         )
     except FileNotFoundError:
         print("No previous stock data found.")
@@ -484,6 +538,10 @@ def main():
         header=0,
         index=False,
     )
+
+    # # Export for testing
+    # hio.export_object_as_std_out(negocios_realizados, os.path.join(test_data_path, "negocios_realizados.out"))
+    # hio.export_object_as_std_out(custos_notas, os.path.join(test_data_path, "custos_notas.out"))
 
     # print(net_per_stock)
 

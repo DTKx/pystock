@@ -96,18 +96,31 @@ CSV
 
 def export_to_csv_from_lists(mylists, outputPath):
     df = pd.DataFrame(mylists)
-    df.to_csv(outputPath, index=False,header=False)
+    df.to_csv(outputPath, index=False, header=False)
 
 
-def read_csv(path,skip_headers=True ,delimiter=","):
+def read_csv(path, skip_headers=False, delimiter=",",func_transf_row=None):
+    """Read csv file, returning a nested list, each row having a column row output will be strings or numeric.
+
+    Args:
+        path (string): path to file.
+        skip_headers (bool, optional): If true skips first line. Defaults to False.
+        delimiter (str, optional): Delimiter that separates csv. Defaults to ",".
+
+    Returns:
+        list: list of lists with lines of file.
+    """
     assert os.path.exists(
         path
     ), f"Could not find the path {path}, please modify the path."
     my_list = []
-    with open(path, newline="",encoding='utf-8') as csvfile:
+    with open(path, newline="", encoding="utf-8") as csvfile:
         f = csv.reader(csvfile, delimiter=delimiter)
-        if skip_headers:next(f, None)  # skip the headers
+        if skip_headers:
+            next(f, None)  # skip the headers
         for row in f:
+            if func_transf_row!=None:
+                row=func_transf_row(row)
             my_list.append(row)
     return my_list
 
