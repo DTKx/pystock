@@ -21,6 +21,7 @@ HEADERS_TABLE_NET_PER_STOCK = [
     "Sold Quantity units",
     "Average Sell Price brl_unit",
     "Profit per unit brl_per_unit",
+    "Unit profit per stock including sales operations costs",
     "Profit brl",
     "Remain Quantity units",
     "Remain Operation value w taxes brl",
@@ -152,6 +153,24 @@ def _search_previous_next_col(key, col, a, trans_function=None, transformation=F
     return prev_index, next_index
 
 
+def _search_index_range_of_key(key, col, a, trans_function=None, transformation=False):
+    ix = []
+    for i, row in enumerate(a):
+        if transformation:
+            val = trans_function(row[col])
+        else:
+            val = row[col]
+        if val == key:
+            ix.append(i)
+    if ix:
+        prev_index = ix[0]
+        next_index = ix[-1] + 1
+    else:
+        prev_index = 0
+        next_index = 0
+    return prev_index, next_index
+
+
 def _get_index_range_search_col(
     m, col, nested_list, trans_function=None, transformation=False
 ):
@@ -165,14 +184,18 @@ def _get_index_range_search_col(
         transformation (boolean): If true uses a tranformation in the column value before comparison of the values.
 
     Returns:
-        int,int: Index of the previous key being searched, first index of the next key of the key  being searched. Ex: key=3 list=[1,3,3,5] returns 0,3
+        int,int: Index of the previous key being searched, first index of the next key of the key  being searched. Ex: key=3 list=[1,3,3,5] returns 1,3
     """
     if nested_list:
-        lo, hi = _search_previous_next_col(
+        # lo, hi = _search_previous_next_col(
+        #     m, col, nested_list, trans_function, transformation
+        # )
+        lo, hi = _search_index_range_of_key(
             m, col, nested_list, trans_function, transformation
         )
+
         return lo, hi
-    else:  # No history of previous Stocks
+    else:  # No operations found for the month
         return 0, 0
 
 
@@ -229,12 +252,12 @@ def get_stocks_per_ticker_previous_month_year(ticker, net_per_stock):
     Returns:
         int,int: prev_units=Units in wallet in previous month,prev_value=Value in wallet in previous month
     """
-    print(ticker)
     # TODO:Implement a verification of month year in the case prev month is from another year
     ix_prev_ticker = -1
     for k in range(len(net_per_stock) - 1, -1, -1):
         if net_per_stock[k][1] == ticker:
             ix_prev_ticker = k
+            break
     if ix_prev_ticker == -1:
         return 0, 0
     else:
@@ -299,7 +322,7 @@ def _append_net_per_stock_for_month(net_per_stock, month_year, negocios_realizad
     if cur_ix == -1:  # No notas was found in the month
         return
     assert _is_month_year_correct(m, y, list_notas, i=cur_ix)
-
+    # TODO:Fix prev_ix, next_ix to avoid doing linear search
     prev_ix, next_ix = _get_index_range_search_col(m, 14, list_notas, get_month, True)
 
     # assert _is_month_year_correct(m, y, list_notas, i=lo)
@@ -310,7 +333,7 @@ def _append_net_per_stock_for_month(net_per_stock, month_year, negocios_realizad
         ticker = negocios_realizados[i][6]
         if ticker in seen_tickers:
             continue
-        print(ticker," ",m)
+        # print(ticker," ",m)
         seen_tickers.add(ticker)
         line = [month_year, ticker]
         buy_units = 0
@@ -326,7 +349,7 @@ def _append_net_per_stock_for_month(net_per_stock, month_year, negocios_realizad
                         negocios_realizados[k][13]
                     )  # Valor operacao+Taxas
                 elif negocios_realizados[k][3] == "V":  # Venda
-                    sell_units += int(negocios_realizados[k][8])                   
+                    sell_units += int(negocios_realizados[k][8])
                     sell_value += float(negocios_realizados[k][10])
                     sell_value_with_ops_cost += sell_value + float(
                         negocios_realizados[k][13]
@@ -341,19 +364,25 @@ def _append_net_per_stock_for_month(net_per_stock, month_year, negocios_realizad
             round((buy_value + prev_value) / bought_units, 2)
             if bought_units > 0.01
             else 0.0
-        )#includes operation costs
+        )  # includes operation costs
         avg_sell_price = round(sell_value / sell_units, 2) if sell_units > 0.01 else 0.0
         avg_unit_profit_loss = (
             round(avg_sell_price - avg_buy_price, 2) if sell_units > 0.01 else 0.0
         )
-        avg_sell_price_with_ops_cost = round(sell_value_with_ops_cost / sell_units, 2) if sell_units > 0.01 else 0.0
-        avg_unit_profit_loss_with_ops_cost=(
-            round(avg_sell_price_with_ops_cost - avg_buy_price, 2) if sell_units > 0.01 else 0.0
+        avg_sell_price_with_ops_cost = (
+            round(sell_value_with_ops_cost / sell_units, 2)
+            if sell_units > 0.01
+            else 0.0
+        )
+        avg_unit_profit_loss_with_ops_cost = (
+            round(avg_sell_price_with_ops_cost - avg_buy_price, 2)
+            if sell_units > 0.01
+            else 0.0
         )
 
         net_units = prev_units + buy_units - sell_units
         net_value = (
-            0.0 if net_units > 0.01 else round(prev_value + buy_value - sell_value, 2)
+            round(prev_value + buy_value - sell_value, 2) if net_units > 0.01 else 0.0
         )
 
         line.extend(
@@ -363,13 +392,13 @@ def _append_net_per_stock_for_month(net_per_stock, month_year, negocios_realizad
                 sell_units,  # Number sold units
                 avg_sell_price,  # Average price per stock sold
                 avg_unit_profit_loss,  # Unit profit per stock
-                avg_unit_profit_loss_with_ops_cost,# Unit profit per stock including sales operations costs
+                avg_unit_profit_loss_with_ops_cost,  # Unit profit per stock including sales operations costs
                 round(avg_unit_profit_loss * sell_units, 2),  # Profit/loss value
                 net_units,
                 net_value,
             ]
         )
-        print(line)
+        # print(line)
         net_per_stock.append(line)
 
 
@@ -382,24 +411,24 @@ def _create_net_per_stock_year_balance(net_per_stock):
     Returns:
         list: Nested list containing the stock_year_balance in december of the current year. This list must be passed for the next year for proper balance.
     """
-    COL_AVAILABLE_STOCKS = 8
+    COL_AVAILABLE_STOCKS = 9
     COL_TICKER = 1
     COL_DATE = 0
 
-    next_year = int(net_per_stock[0][0].split("/")[1])+1
+    next_year = int(net_per_stock[0][0].split("/")[1]) + 1
     net_per_stock_year_balance = []
     set_tickers_seen = set()
-    for i in range(len(net_per_stock)-1,-1,-1):  # Loop latest months first
+    for i in range(len(net_per_stock) - 1, -1, -1):  # Loop latest months first
         ticker = net_per_stock[i][COL_TICKER]
-        print(ticker)
+        # print(ticker)
         if ticker not in set_tickers_seen:
             set_tickers_seen.add(ticker)
             if net_per_stock[i][COL_AVAILABLE_STOCKS] >= 0.01:  # Has stocks
-                line=net_per_stock[i].copy()
+                line = net_per_stock[i].copy()
                 line[COL_DATE] = f"00/{next_year}"
-                print(net_per_stock[i])
+                # print(net_per_stock[i])
                 net_per_stock_year_balance.append(line)
-                print(line)
+                # print(line)
     return net_per_stock_year_balance
 
 
@@ -421,12 +450,13 @@ def main():
     try:
         net_per_stock = _load_table_net_per_stock(
             os.path.join(
-                data_processed_notas_path_prev_year, f"net_per_stock_balance{prev_year}.csv"
+                data_processed_notas_path_prev_year,
+                f"net_per_stock_balance{prev_year}.csv",
             )
         )
     except FileNotFoundError:
         print("No previous stock data found.")
-        net_per_stock=[]
+        net_per_stock = []
     # TODO:Fix range of 1,13. Verify the potential breaks given the change of the year.
     for i in range(1, 13):
         if i < 10:
@@ -435,15 +465,27 @@ def main():
             date = f"{i}/{cur_year}"
         _append_net_per_stock_for_month(net_per_stock, date, negocios_realizados)
     net_per_stock_df = pd.DataFrame(net_per_stock)
-    net_per_stock_df.to_csv(os.path.join(data_processed_notas_path_cur_year,f"net_per_stock{cur_year}.csv"),header=0,index=False)
+    net_per_stock_df.to_csv(
+        os.path.join(
+            data_processed_notas_path_cur_year, f"net_per_stock{cur_year}.csv"
+        ),
+        header=0,
+        index=False,
+    )
 
     net_per_stock_year_balance = _create_net_per_stock_year_balance(net_per_stock)
 
     net_per_stock_year_balance_df = pd.DataFrame(net_per_stock_year_balance)
-    net_per_stock_year_balance_df.to_csv(os.path.join(data_processed_notas_path_cur_year,f"net_per_stock_year_balance{cur_year}.csv"),header=0,index=False)
+    net_per_stock_year_balance_df.to_csv(
+        os.path.join(
+            data_processed_notas_path_cur_year,
+            f"net_per_stock_year_balance{cur_year}.csv",
+        ),
+        header=0,
+        index=False,
+    )
 
-    print(net_per_stock)
-    # net_per_stock[1][0]
+    # print(net_per_stock)
 
 
 if __name__ == "__main__":
