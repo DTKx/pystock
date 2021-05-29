@@ -8,10 +8,10 @@ from pystock import helpersio as hio
 
 def main():   
     data_raw_notas_path = os.path.abspath(
-        os.path.join("data/raw/2020/btg/notas_corretagem/")
+        os.path.join("data/raw/2019/btg/notas_corretagem/")
     )
     data_processed_notas_path = os.path.abspath(
-        os.path.join("data/processed/2020/btg/notas_corretagem/")
+        os.path.join("data/processed/2019/btg/notas_corretagem/")
     )
     test_data_path= os.path.abspath(os.path.join("tests/tests_data/"))
     hio.assert_exist_path(data_raw_notas_path)
@@ -19,13 +19,13 @@ def main():
     hio.assert_exist_path(test_data_path)
 
 
-    inputPath = os.path.join(data_raw_notas_path, "notas_operacoes_2020.pdf")
+    inputPath = os.path.join(data_raw_notas_path, "notas_operacoes_2019.pdf")
     negocios_realizados, custos_notas = pnc.parse_notas_corretagem_btg(inputPath)
 
     negocios_realizados_df = pd.DataFrame(negocios_realizados)
-    negocios_realizados_df.to_csv(os.path.join(data_processed_notas_path,"negocios_realizados.csv"),header=0)
 
-    hio.exportToJson(custos_notas,os.path.join(data_processed_notas_path,"custos_notas.json"))
+    # negocios_realizados_df.to_csv(os.path.join(data_processed_notas_path,"negocios_realizados_2019.csv"),header=0)
+    # hio.exportToJson(custos_notas,os.path.join(data_processed_notas_path,"custos_notas.json"))
 
     # # Export for testing
     # hio.export_object_as_std_out(negocios_realizados, os.path.join(test_data_path, "negocios_realizados.out"))

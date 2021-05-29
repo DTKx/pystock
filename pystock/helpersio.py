@@ -5,6 +5,7 @@ from ast import literal_eval
 import pandas as pd
 import json
 import os
+import csv
 
 
 def exportPdFrameToLatex(path, file):
@@ -21,12 +22,17 @@ def export_obj(obj, path):
     with codecs.open(path, mode="w", encoding="utf-8") as f:  # Test also mode="wb"
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
+
 def assert_exist_path(path):
-    assert os.path.exists(path),f"Could not find the path {path}, please modify the path."
+    assert os.path.exists(
+        path
+    ), f"Could not find the path {path}, please modify the path."
 
 
 def load_obj(path):
-    assert os.path.exists(path), f"Could not find the path {path}, please modify the path."
+    assert os.path.exists(
+        path
+    ), f"Could not find the path {path}, please modify the path."
     with codecs.open(path, mode="w", encoding="utf-8") as f:  # Test also mode="rb"
         obj = pickle.load(f)
     return obj
@@ -38,14 +44,18 @@ def export_object_as_std_out(myobject, path):
 
 
 def import_object_as_literal(path):
-    assert os.path.exists(path), f"Could not find the path {path}, please modify the path."
+    assert os.path.exists(
+        path
+    ), f"Could not find the path {path}, please modify the path."
     with codecs.open(path, mode="r", encoding="utf-8") as f:
         a = literal_eval(f.read().strip().replace("\n", ""))
     return a
 
 
 def read_strings(path):
-    assert os.path.exists(path), f"Could not find the path {path}, please modify the path."
+    assert os.path.exists(
+        path
+    ), f"Could not find the path {path}, please modify the path."
     a = ""
     with codecs.open(path, mode="r", encoding="utf-8") as f:
         for line in f.readlines():
@@ -55,7 +65,9 @@ def read_strings(path):
 
 
 def createCsvMainFrom3ColDict(inputPath, dictAuxiliar, outputPath):
-    assert os.path.exists(inputPath), f"Could not find the path {inputPath}, please modify the path."
+    assert os.path.exists(
+        inputPath
+    ), f"Could not find the path {inputPath}, please modify the path."
     df = pd.DataFrame.from_dict(
         {
             (dictAuxiliar[i][j], j): i
@@ -77,25 +89,57 @@ def exportToJson(data, path):
         json.dump(data, codecs.getwriter("utf-8")(f), ensure_ascii=False)
 
 
+"""
+CSV
+"""
+
+
+def export_to_csv_from_lists(mylists, outputPath):
+    df = pd.DataFrame(mylists)
+    df.to_csv(outputPath, index=False,header=False)
+
+
+def read_csv(path,skip_headers=True ,delimiter=","):
+    assert os.path.exists(
+        path
+    ), f"Could not find the path {path}, please modify the path."
+    my_list = []
+    with open(path, newline="",encoding='utf-8') as csvfile:
+        f = csv.reader(csvfile, delimiter=delimiter)
+        if skip_headers:next(f, None)  # skip the headers
+        for row in f:
+            my_list.append(row)
+    return my_list
+
+
 def main():
-    # Test export_object_as_std_out
-    a = [1, [1], ["cc"], ["importação , 0.0"], "Valor líquido das operações 5.200,00 C"]
-    export_object_as_std_out(a, "out.txt")
+    # # Test export_object_as_std_out
+    # a = [1, [1], ["cc"], ["importação , 0.0"], "Valor líquido das operações 5.200,00 C"]
+    # export_object_as_std_out(a, "out.txt")
 
-    # Test import_object_as_literal
-    b = import_object_as_literal("out.txt")
+    # # Test import_object_as_literal
+    # b = import_object_as_literal("out.txt")
+    # print(b[0])
+    # print(b[1])
+    # print(b[2])
+    # print(b[3])
+
+    # # Test read_strings
+    # a = "Valor líquido das operações 5.200,00 C"
+    # export_object_as_std_out(a, "out.txt")
+    # print(read_strings("out.txt"), end="")
+
+    # assert_exist_path(os.getcwd())
+    # # assert_exist_path(os.path.join(os.getcwd(),"aas"))#Throws assertion error
+
+    # Tests export and import  CSV
+    a = [[1, 2, 2], [1, 2, 2], [1, 2, 2]]
+    path = os.path.abspath("tests/tests_data/my_list.csv")
+    export_to_csv_from_lists(a, path)
+    b = read_csv(path)
+    print(b)
     print(b[0])
-    print(b[1])
-    print(b[2])
-    print(b[3])
-
-    # Test read_strings
-    a = "Valor líquido das operações 5.200,00 C"
-    export_object_as_std_out(a, "out.txt")
-    print(read_strings("out.txt"), end="")
-
-    assert_exist_path(os.getcwd())
-    # assert_exist_path(os.path.join(os.getcwd(),"aas"))#Throws assertion error
+    print(b[0][0])
 
 
 if __name__ == "__main__":
