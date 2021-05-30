@@ -28,7 +28,6 @@ Improve the experience, precision and time efficiency of small investors managin
 Through the creation of a tool that automatically calculates information for IFRS common share stock trade directly from the PDF received from the broker (BTG).
 
 ## Installation
-<!--
 
 ### Python
 Please install [Python](https://www.python.org/downloads/).
@@ -45,10 +44,8 @@ Please install the python package manager [Anaconda](https://www.anaconda.com/pr
 
 Using Conda terminal:
 ```
-conda env create -f environment.yml
+conda env create -f environ.yml
 ```
-
--->
 
 
 ## Usage
