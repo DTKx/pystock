@@ -26,10 +26,10 @@ def calc_monthly_net_result_per_stock(
                 data_processed_notas_path_prev_year,
                 f"net_per_stock_year_balance{PREV_YEAR}.csv",
             ),
-            skip_headers=False,
+            skip_headers=True,
             func_transf_row=cmnr._transform_str_numeric_read_net_per_stock,
         )
-    except FileNotFoundError:
+    except AssertionError:
         print("No previous stock data found.")
         net_per_stock = []
     # TODO:Fix range of 1,13. Verify the potential breaks given the change of the year.
@@ -112,20 +112,46 @@ def main():
             os.path.join(
                 data_processed_notas_path_cur_year, f"net_per_stock{CUR_YEAR}.csv"
             ),
-            header=0,
+            header=cmnr.HEADERS_TABLE_NET_PER_STOCK,
             index=False,
         )
     if EXPORT_NET_PER_STOCK_YEAR_BALANCE:
-        net_per_stock_year_balance_df = pd.DataFrame(net_per_stock_year_balance)
-        net_per_stock_year_balance_df.to_csv(
+        if net_per_stock_year_balance:
+            net_per_stock_year_balance_df = pd.DataFrame(net_per_stock_year_balance)
+            net_per_stock_year_balance_df.to_csv(
+                os.path.join(
+                    data_processed_notas_path_cur_year,
+                    f"net_per_stock_year_balance{CUR_YEAR}.csv",
+                ),
+                header=cmnr.HEADERS_TABLE_NET_PER_STOCK,
+                index=False,
+            )
+        else:
+            net_per_stock_year_balance_df = pd.DataFrame(net_per_stock_year_balance)
+            net_per_stock_year_balance_df.to_csv(
+                os.path.join(
+                    data_processed_notas_path_cur_year,
+                    f"net_per_stock_year_balance{CUR_YEAR}.csv",
+                ),
+                header=0,
+                index=False,
+            )
+
+    # Calculate monthly profit loss per month
+    CALC_MONTHLY_PROFIT_LOSS = True
+    EXPORT_MONTHLY_PROFIT_LOSS = True
+    if CALC_MONTHLY_PROFIT_LOSS:
+        monthly_profit_loss=cmnr._calc_monthly_profit_loss(net_per_stock)
+        monthly_profit_loss_df = pd.DataFrame(monthly_profit_loss)
+        monthly_profit_loss_df.to_csv(
             os.path.join(
                 data_processed_notas_path_cur_year,
-                f"net_per_stock_year_balance{CUR_YEAR}.csv",
+                f"monthly_profit_loss_{CUR_YEAR}.csv",
             ),
-            header=0,
+            header=cmnr.HEADERS_MONTHLY_PROFIT_LOSS,
             index=False,
         )
-
+        
 
 if __name__ == "__main__":
     main()

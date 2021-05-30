@@ -9,6 +9,7 @@ import json, codecs
 import pystock.helpersio as hio
 import sys
 
+HEADERS_NEGOCIOS_REALIZADOS=['Q', 'Negociação', 'C/V', 'Tipo Mercado', 'Prazo', 'Especificação do título', 'Obs. (*)', 'Quantidade', 'Preço / Ajuste', 'Valor Operação / Ajuste', 'D/C','Nr. nota']
 
 def _parse_add_negocios_realizados(table_negocios_realizados, num_nota):
     """Extrai tabela de negócios realizados, adicionando ao fim da tabela o número da nota.

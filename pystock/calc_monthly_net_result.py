@@ -13,19 +13,23 @@ import pystock.helpersio as hio#Running from package perspective
 # import helpersio as hio
 import sys
 
+
+
 HEADERS_TABLE_NET_PER_STOCK = [
     "Month Year",
     "Ticker",
     "Available Quantity units",
     "Average Buy Price brl_unit",
     "Sold Quantity units",
-    "Average Sell Price brl_unit",
-    "Profit per unit brl_per_unit",
-    "Unit profit per stock including sales operations costs",
-    "Profit brl",
+    "Average Sell Price without sales operations costs brl_unit",
+    "Profit Loss without sales operations costs brl_per_unit",
+    "Profit Loss with sales operations costs per unit brl_per_unit",
+    "Profit Loss brl",
     "Remain Quantity units",
-    "Remain Operation value w taxes brl",
+    "Remain Operation value with sales operations costs brl",
 ]
+HEADERS_MONTHLY_PROFIT_LOSS=["Month Year","Initial assets brl","Total transactions brl","Total profitloss without sales costs brl","Total profitloss with sales costs brl","Ratio Profit to assets sold percentage ","Remaining Assets brl"]
+
 
 
 def _transform_str_numeric_read_negocios_realizados(row):
@@ -431,20 +435,21 @@ def _append_net_per_stock_for_month(net_per_stock, month_year, negocios_realizad
 
         net_units = prev_units + buy_units - sell_units
         net_value = (
-            round(prev_value + buy_value - sell_value, 2) if net_units >= 0.01 else 0.0
+            round(prev_value + buy_value - sell_value_with_ops_cost, 2) if net_units >= 0.01 else 0.0
         )
+
 
         line.extend(
             [
                 bought_units,  # Number of units in wallet
                 avg_buy_price,  # Average price per stock bought considers stocks in wallet
                 sell_units,  # Number sold units
-                avg_sell_price,  # Average price per stock sold
-                avg_unit_profit_loss,  # Unit profit per stock
-                avg_unit_profit_loss_with_ops_cost,  # Unit profit per stock including sales operations costs
-                round(avg_unit_profit_loss * sell_units, 2),  # Profit/loss value
-                net_units,
-                net_value,
+                avg_sell_price,  # Average Sell Price without sales operations costs brl_unit
+                avg_unit_profit_loss,  # Profit Loss without sales operations costs brl_per_unit
+                avg_unit_profit_loss_with_ops_cost,  # Profit Loss with sales operations costs per unit brl_per_unit
+                round(avg_unit_profit_loss * sell_units, 2),  # Profit Loss brl
+                net_units,#Remain Quantity units
+                net_value,#Remain Operation value with sales operations costs brl
             ]
         )
         # print(line)
@@ -480,9 +485,111 @@ def _create_net_per_stock_year_balance(net_per_stock):
                 # print(line)
     return net_per_stock_year_balance
 
+def get_summary_values_month(m,year,net_per_stock):
+    initial_assets=0.0#Assets from previous month
+    tot_transactions=0.0
+    tot_profit_wo_sales=0.0
+    tot_profit_w_sales=0.0
+    remain_assets=0.0
+    for i in range(1,len(net_per_stock)):#operations
+        month=int(get_month(net_per_stock[i][0]))
+        if month!=m:#stops
+            break
+        initial_assets+=net_per_stock[i][2]*net_per_stock[i][3]#Assets from previous month
+        tot_transactions+=net_per_stock[i][4]*net_per_stock[i][5]    # Total transactions brl=Sold Quantity units"*Average Sell Price without sales operations costs brl_unit
+        tot_profit_wo_sales+=net_per_stock[i][4]*net_per_stock[i][6]    # Total profitloss without sales costs brl=unitprofitwo*qnt
+        tot_profit_w_sales+=net_per_stock[i][4]*net_per_stock[i][7]    # Total profitloss with sales costs brl=unitprofitwprice*qnt
+        remain_assets+=net_per_stock[i][10]
+    profit_to_assets=round(tot_profit_w_sales*100/initial_assets,2) if initial_assets>0.01 else 0.0  # Ratio Profit to total assets percentage=Total profitloss with sales costs/Initial Assets
+    return [f"{m}/{year}",initial_assets,tot_transactions,tot_profit_wo_sales,tot_profit_w_sales,profit_to_assets,remain_assets]
+
+def _calc_monthly_profit_loss(net_per_stock):
+    """Calculates the monthly profit loss.
+    Total transactions brl=Sold Quantity units"*Average Sell Price without sales operations costs brl_unit
+    Total profitloss without sales costs brl=unitprofitwo*qnt
+    Total profitloss with sales costs brl=unitprofitwprice*qnt
+    Ratio Profit to total assets percentage=Total profitloss with sales costs/Total transactions
+    Remaining Assets brl=Initial Assets-Total transactions brl
+
+    Args:
+        net_per_stock (list): List of lists.
+
+    Returns:
+        list: List of lists monthly profit loss.
+    """
+    monthly_profit_loss=[]
+    year=net_per_stock[0][0].split('/')[1]
+    added_month=1
+    i=1
+    while i<len(net_per_stock):
+        initial_assets=0.0
+        tot_transactions=0.0
+        tot_profit_wo_sales=0.0
+        tot_profit_w_sales=0.0
+        remain_assets=0.0
+        month=int(get_month(net_per_stock[i][0]))
+        while True:
+            initial_assets+=net_per_stock[i][2]*net_per_stock[i][3]#Assets from previous month
+            tot_transactions+=net_per_stock[i][4]*net_per_stock[i][5]    # Total transactions brl=Sold Quantity units"*Average Sell Price without sales operations costs brl_unit
+            tot_profit_wo_sales+=net_per_stock[i][4]*net_per_stock[i][6]    # Total profitloss without sales costs brl=unitprofitwo*qnt
+            tot_profit_w_sales+=net_per_stock[i][4]*net_per_stock[i][7]    # Total profitloss with sales costs brl=unitprofitwprice*qnt
+            remain_assets+=net_per_stock[i][10]
+            try:
+                next_month=int(get_month(net_per_stock[i+1][0]))
+            except IndexError:
+                next_month=month
+            if (i>=len(net_per_stock)-1)|(next_month!=month):
+                break
+            else:
+                i+=1
+        profit_to_assets=round(tot_profit_w_sales*100/initial_assets,2) if initial_assets>0.01 else 0.0  # Ratio Profit to total assets percentage=Total profitloss with sales costs/Initial Assets    
+        monthly_profit_loss.append([f"{month}/{year}",round(initial_assets,2),round(tot_transactions,2),round(tot_profit_wo_sales,2),round(tot_profit_w_sales,2),profit_to_assets,round(remain_assets,2)])
+        i+=1
+    return monthly_profit_loss
+
+
+
+def _calc_profit_loss_month(net_per_stock):
+    """Calculates the monthly profit loss.
+    Total transactions brl=Sold Quantity units"*Average Sell Price without sales operations costs brl_unit
+    Total profitloss without sales costs brl=unitprofitwo*qnt
+    Total profitloss with sales costs brl=unitprofitwprice*qnt
+    Ratio Profit to total assets percentage=Total profitloss with sales costs/Total transactions
+    Remaining Assets brl=Initial Assets-Total transactions brl
+
+    Args:
+        net_per_stock (list): List of lists.
+
+    Returns:
+        list: List of lists monthly profit loss.
+    """
+    monthly_profit_loss=[]
+    year=net_per_stock[0][0].split('/')[1]
+    added_month=1
+    for i in range(1,len(net_per_stock)):#Loop per operations
+        month=int(get_month(net_per_stock[i][0]))
+        if month<added_month:
+            continue
+        elif month>added_month:#Loops Months with no transaction
+            for k in range(added_month,i): 
+                initial_assets=net_per_stock[k][2]*net_per_stock[k][3]#Assets from previous month
+                tot_transactions=0.0
+                tot_profit_wo_sales=0.0
+                tot_profit_w_sales=0.0
+                profit_to_assets=0.0
+                remain_assets=initial_assets
+                monthly_profit_loss.append([f"{k}/{year}",initial_assets,tot_transactions,tot_profit_wo_sales,tot_profit_w_sales,profit_to_assets,remain_assets])
+                added_month+=1
+        assert month==added_month,"Incorrect month."
+        #Starts Months with transaction        
+        monthly_profit_loss.append(get_summary_values_month(added_month,year,net_per_stock))
+        # monthly_profit_loss.append([f"{i}/{year}",initial_assets,tot_transactions,tot_profit_wo_sales,tot_profit_w_sales,profit_to_assets,remain_assets])
+        added_month+=1
+    return monthly_profit_loss
+
 
 def main():
-    cur_year = 2020
+    cur_year = 2019
     prev_year = cur_year - 1
 
     data_processed_notas_path_cur_year = os.path.abspath(
@@ -508,7 +615,8 @@ def main():
             ),
             skip_headers=False,func_transf_row=_transform_str_numeric_read_net_per_stock
         )
-    except FileNotFoundError:
+    except AssertionError:
+    # except FileNotFoundError|AssertionError:
         print("No previous stock data found.")
         net_per_stock = []
     # TODO:Fix range of 1,13. Verify the potential breaks given the change of the year.
@@ -518,6 +626,7 @@ def main():
         else:
             date = f"{i}/{cur_year}"
         _append_net_per_stock_for_month(net_per_stock, date, negocios_realizados)
+    print(net_per_stock)
     net_per_stock_df = pd.DataFrame(net_per_stock)
     net_per_stock_df.to_csv(
         os.path.join(
@@ -535,15 +644,30 @@ def main():
             data_processed_notas_path_cur_year,
             f"net_per_stock_year_balance{cur_year}.csv",
         ),
-        header=0,
+        header=HEADERS_TABLE_NET_PER_STOCK,
         index=False,
     )
+
+
+    # Calc monthly profit loss
+
+    monthly_profit_loss=_calc_monthly_profit_loss(net_per_stock)
+    monthly_profit_loss_df = pd.DataFrame(monthly_profit_loss)
+    monthly_profit_loss_df.to_csv(
+        os.path.join(
+            data_processed_notas_path_cur_year,
+            f"monthly_profit_loss_{cur_year}.csv",
+        ),
+        header=HEADERS_MONTHLY_PROFIT_LOSS,
+        index=False,
+    )
+
+    # print(monthly_profit_loss)
 
     # # Export for testing
     # hio.export_object_as_std_out(negocios_realizados, os.path.join(test_data_path, "negocios_realizados.out"))
     # hio.export_object_as_std_out(custos_notas, os.path.join(test_data_path, "custos_notas.out"))
 
-    # print(net_per_stock)
 
 
 if __name__ == "__main__":
